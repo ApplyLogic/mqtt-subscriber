@@ -21,7 +21,11 @@
 go.work
 go.work.sum
 
+#intelliJ files
+.idea/
+
 # env file
 .env
+*.yaml
 
 *.pprof

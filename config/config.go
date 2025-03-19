@@ -10,17 +10,19 @@ type Config struct {
 }
 
 type MQTT struct {
-	ClientId string
-	Broker   string
-	Port     int
-	Topic    string
-	Username string
-	Password string
+	ClientId     string
+	Broker       string
+	Port         int
+	RawDataTopic string
+	MessageTopic string
+	Username     string
+	Password     string
 }
 
 type TLS struct {
-	CertPath   string
-	CACertFile string
+	CACertFile     string
+	ClientCertFile string
+	ClientKeyFile  string
 }
 
 func LoanConfig() (*Config, error) {
@@ -32,15 +34,17 @@ func LoanConfig() (*Config, error) {
 
 	cfg := &Config{
 		MQTT: &MQTT{
-			ClientId: viper.GetString("MQTT_CLIENT_ID"),
-			Broker:   viper.GetString("MQTT_BROKER"),
-			Port:     viper.GetInt("MQTT_PORT"),
-			Topic:    viper.GetString("MQTT_TOPIC"),
-			Username: viper.GetString("MQTT_USERNAME"),
-			Password: viper.GetString("MQTT_PASSWORD"),
+			ClientId:     viper.GetString("MQTT_CLIENT_ID"),
+			Broker:       viper.GetString("MQTT_BROKER"),
+			Port:         viper.GetInt("MQTT_PORT"),
+			RawDataTopic: viper.GetString("MQTT_RAW_TOPIC"),
+			MessageTopic: viper.GetString("MQTT_MSG_TOPIC"),
+			Username:     viper.GetString("MQTT_USERNAME"),
+			Password:     viper.GetString("MQTT_PASSWORD"),
 		},
 		TLS: &TLS{
-			CertPath: viper.GetString("TLS_CERT_PATH"),
+			ClientCertFile: viper.GetString("TLS_CLIENT_CERT_FILE"),
+			ClientKeyFile:  viper.GetString("TLS_CLIENT_KEY_FILE"),
 			//if you want clients to authenticate only with certs issued by your CA
 			CACertFile: viper.GetString("TLS_CA_CERT_FILE"),
 		},

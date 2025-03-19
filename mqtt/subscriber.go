@@ -1,54 +1,33 @@
 package mqtt
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"github.com/ApplyLogic/mqtt-subscriber/config"
 	"github.com/ApplyLogic/mqtt-subscriber/internal/middleware"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"log"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 type Subscriber struct {
 	Client mqtt.Client
 	Logger *middleware.Logger
+	Config *config.Config
 }
 
 func New(cfg *config.Config, logger *middleware.Logger) *Subscriber {
-	// Load tls cert from your cert file
-	cert, err := tls.LoadX509KeyPair(fmt.Sprintf("%s/test_cert.pem", cfg.TLS.CertPath), fmt.Sprintf("%s/test_cert.key", cfg.TLS.CertPath))
-	if err != nil {
-		logger.Log("err", err.Error())
-		log.Fatal(err)
-	}
 
-	// Basic TLS Config
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-	}
+	//tlsConfig, err := configureTLS(cfg)
+	//if err != nil {
+	//	log.Fatalf("Error configuring TLS: %v", err)
+	//}
 
-	// Optionally, if you want clients to authenticate only with certs issued by your CA,
-	// you might want to use something like this:
-	if cfg.TLS.CACertFile != "" {
-		pemCACert, err := os.ReadFile(cfg.TLS.CACertFile)
-		if err != nil {
-			logger.Log("err", err.Error())
-			log.Fatal(err)
-		}
-		certPool := x509.NewCertPool()
-		ok := certPool.AppendCertsFromPEM(pemCACert)
-		if ok {
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			tlsConfig.ClientCAs = certPool
-		}
-	}
-
+	// Create TCP client
 	opts := mqtt.NewClientOptions()
+	//opts.SetTLSConfig(tlsConfig)
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", cfg.MQTT.Broker, cfg.MQTT.Port))
 	opts.SetClientID(fmt.Sprintf("%s-sub", cfg.MQTT.ClientId))
-	//opts.SetTLSConfig(tlsConfig)
 	//opts.SetUsername(cfg.MQTT.Username)
 	//opts.SetPassword(cfg.MQTT.Password)
 	opts.SetOnConnectHandler(func(client mqtt.Client) {
@@ -62,17 +41,29 @@ func New(cfg *config.Config, logger *middleware.Logger) *Subscriber {
 	return &Subscriber{
 		Client: client,
 		Logger: logger,
+		Config: cfg,
 	}
 }
 
-var MessageSubHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
-}
+func (s *Subscriber) Start() {
+	if token := s.Client.Connect(); token.Wait() && token.Error() != nil {
+		panic(fmt.Sprintf("Error connecting to MQTT broker: %s", token.Error()))
+	}
+	if token := s.Client.Subscribe(s.Config.MQTT.RawDataTopic, 2, messageSubHandler); token.Wait() && token.Error() != nil {
+		panic(fmt.Sprintf("Error subscribing to topic:  %s", token.Error()))
+	}
+	fmt.Println("Subscribed to data topic:", s.Config.MQTT.RawDataTopic)
+	if token := s.Client.Subscribe(s.Config.MQTT.MessageTopic, 2, messageSubHandler); token.Wait() && token.Error() != nil {
+		panic(fmt.Sprintf("Error subscribing to topic:  %s", token.Error()))
+	}
+	fmt.Println("Subscribed to message topic:", s.Config.MQTT.MessageTopic)
 
-var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	fmt.Println("Connected")
-}
+	// Wait for a signal to exit the program gracefully
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
 
-var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Printf("Connect lost: %v\n", err)
+	s.Client.Unsubscribe(s.Config.MQTT.RawDataTopic)
+	s.Client.Unsubscribe(s.Config.MQTT.MessageTopic)
+	s.Client.Disconnect(250)
 }
