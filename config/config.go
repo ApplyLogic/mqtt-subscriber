@@ -2,52 +2,45 @@ package config
 
 import (
 	"github.com/spf13/viper"
+	"log"
 )
 
 type Config struct {
-	MQTT *MQTT
-	TLS  *TLS
+	Gateway struct {
+		Host string
+		Port string
+	}
+	MQTT struct {
+		Broker   string
+		Port     string
+		ClientID string
+		Username string
+		Password string
+		Topic    string
+		CertPath string
+	}
+	InfluxDB struct {
+		URL    string
+		Token  string
+		Org    string
+		Bucket string
+	}
 }
 
-type MQTT struct {
-	ClientId     string
-	Broker       string
-	Port         int
-	RawDataTopic string
-	MessageTopic string
-	Username     string
-	Password     string
-}
+func LoadConfig(configPath string) (*Config, error) {
+	viper.SetConfigFile(configPath)
+	viper.SetConfigType("yaml")
 
-type TLS struct {
-	CACertFile     string
-	ClientCertFile string
-	ClientKeyFile  string
-}
-
-func LoanConfig() (*Config, error) {
-	viper.SetConfigFile(".env")
-	err := viper.ReadInConfig()
-	if err != nil {
+	if err := viper.ReadInConfig(); err != nil {
+		log.Printf("Error reading config file: %s", err)
 		return nil, err
 	}
 
-	cfg := &Config{
-		MQTT: &MQTT{
-			ClientId:     viper.GetString("MQTT_CLIENT_ID"),
-			Broker:       viper.GetString("MQTT_BROKER"),
-			Port:         viper.GetInt("MQTT_PORT"),
-			RawDataTopic: viper.GetString("MQTT_RAW_TOPIC"),
-			MessageTopic: viper.GetString("MQTT_MSG_TOPIC"),
-			Username:     viper.GetString("MQTT_USERNAME"),
-			Password:     viper.GetString("MQTT_PASSWORD"),
-		},
-		TLS: &TLS{
-			ClientCertFile: viper.GetString("TLS_CLIENT_CERT_FILE"),
-			ClientKeyFile:  viper.GetString("TLS_CLIENT_KEY_FILE"),
-			//if you want clients to authenticate only with certs issued by your CA
-			CACertFile: viper.GetString("TLS_CA_CERT_FILE"),
-		},
+	var config Config
+	if err := viper.Unmarshal(&config); err != nil {
+		log.Printf("Unable to decode config: %s", err)
+		return nil, err
 	}
-	return cfg, nil
+
+	return &config, nil
 }

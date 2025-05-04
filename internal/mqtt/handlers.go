@@ -5,27 +5,28 @@ import (
 	"crypto/x509"
 	"fmt"
 	"github.com/ApplyLogic/mqtt-subscriber/config"
+	mqtt2 "github.com/ApplyLogic/mqtt-subscriber/mqtt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"os"
 )
 
-var messageSubHandler mqtt.MessageHandler = subscriber
+func subscriber(client mqtt.Client, msg mqtt.Message) {
+	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
+}
+
+var messageSubHandler mqtt.MessageHandler = mqtt2.subscriber
 
 var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	fmt.Println("Connected")
+	fmt.Println("connectHandler: Connected")
 
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		panic(fmt.Sprintf("Error connecting to MQTT broker: %s", token.Error()))
 	}
 
-	if token := client.Subscribe("topic/data", 2, messageSubHandler); token.Wait() && token.Error() != nil {
-		panic(fmt.Sprintf("Error subscribing to topic:  %s", token.Error()))
+	if token := client.Subscribe("tt_controller/device/raw", 1, mqtt2.subscriber); token.Wait() && token.Error() != nil {
+		panic(fmt.Sprintf("Error subscribing to topic: %s", token.Error()))
 	}
-	fmt.Println("Subscribed to data topic:", "topic/data")
-	if token := client.Subscribe("topic/msg", 2, messageSubHandler); token.Wait() && token.Error() != nil {
-		panic(fmt.Sprintf("Error subscribing to topic:  %s", token.Error()))
-	}
-	fmt.Println("Subscribed to message topic:", "topic/msg")
+	fmt.Println("Subscribed to data topic:", "tt_controller/device/raw")
 }
 
 var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
